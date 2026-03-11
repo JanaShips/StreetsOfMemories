@@ -1,0 +1,61 @@
+name: Generate manifest.json
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build manifest
+        run: |
+          echo '{' > manifest.json
+
+          declare -A FOLDER_MAP=(
+            ["good-morning"]="Good Morning"
+            ["good-night"]="Good Night"
+            ["inspire"]="Inspire"
+            ["fun"]="Fun"
+            ["love"]="Love"
+            ["motivation"]="Motivation"
+            ["special"]="Special"
+            ["thought-of-the-day"]="Thought Of The Day"
+            ["birthday"]="Birthday"
+            ["anniversary"]="Anniversary"
+          )
+
+          FIRST=true
+          for folder in "${!FOLDER_MAP[@]}"; do
+            if [ -d "$folder" ]; then
+              TITLE="${FOLDER_MAP[$folder]}"
+              FILES=$(find "$folder" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | sort | sed 's/.*/"&"/' | paste -sd,)
+              if [ -n "$FILES" ]; then
+                if [ "$FIRST" = true ]; then
+                  FIRST=false
+                else
+                  echo ',' >> manifest.json
+                fi
+                printf '  "%s": [%s]' "$TITLE" "$FILES" >> manifest.json
+              fi
+            fi
+          done
+
+          echo '' >> manifest.json
+          echo '}' >> manifest.json
+
+          echo "Generated manifest.json:"
+          cat manifest.json
+
+      - name: Commit manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git diff --cached --quiet || git commit -m "chore: update manifest.json"
+          git push
